@@ -1,0 +1,53 @@
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Int64, Float64, String
+from std_msgs.msg import String as LED_message
+import serial
+
+class Arduino_Bridge_Node(Node):
+    def __init__(self):
+        super().__init__('arduino_serial_node')
+        self.port = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+        self.timer = self.create_timer(1.0, self.read_serial)
+
+        self.pub_a = self.create_publisher(Int64, '/sensor_data/value_a', 10)
+        self.pub_b = self.create_publisher(Float64, '/sensor_data/value_b', 10)
+        self.pub_c = self.create_publisher(Int64, '/sensor_data/value_c', 10)
+        self.pub_d = self.create_publisher(String, '/sensor_data/value_d', 10)
+
+        
+        self.sub = self.create_subscription(LED_message, 'led_control', self.led_callback, 10)
+
+    def read_serial(self):
+        if self.port.in_waiting:
+            line = self.port.readline().decode().strip()
+            parts = line.split(',')
+            if len(parts) == 4:
+                try:
+                    a = int(parts[0])
+                    b = float(parts[1])
+                    c = int(parts[2])
+                    d = parts[3]
+
+                    self.pub_a.publish(Int64(data=a))
+                    self.pub_b.publish(Float64(data=b))
+                    self.pub_c.publish(Int64(data=c))
+                    self.pub_d.publish(String(data=d))
+
+                    self.get_logger().info(f'Received: {a}, {b}, {c}, {d}')
+                except ValueError:
+                    self.get_logger().warn("Invalid data format received")
+
+   def led_callback(self, msg):
+    command = msg.data.strip().upper()
+    if command in ["ON", "OFF"]:
+        self.port.write((command + '\n').encode())
+        self.get_logger().info(f' Command sent to Arduino: {command}')
+
+
+def main(args=None):
+    rclpy.init()
+    node = Arduino_Bridge_Node()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
