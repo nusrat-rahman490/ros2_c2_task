@@ -1,0 +1,23 @@
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
+class LED_Controller(Node):
+    def __init__(self):
+        super().__init__('led_control_node')
+        self.publisher_ = self.create_publisher(String, 'led_control', 10)
+        self.timer = self.create_timer(1.0, self.receive_input)
+
+    def receive_input(self):
+        command= input("Type (ON / OFF) to control LED: ").strip().upper()
+        message = String()
+        message.data = command
+        self.publisher_.publish( message)
+        self.get_logger().info(f'Command sent to Arduino: { message.data}')
+
+def main(args=None):
+    rclpy.init()
+    node = LED_Controller()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
